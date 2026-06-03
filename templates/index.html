@@ -144,7 +144,17 @@
             <td>{{ worker[3] }}</td>
             <td>{{ worker[4] }}</td>
             <td>{{ worker[5] }}</td>
-            <td>{{ worker[6] }}</td>
+            <td>
+    {% if worker[6] == 'Active' %}
+        <span class="badge bg-success px-3 py-2">Active</span>
+
+    {% elif worker[6] == 'On Leave' %}
+        <span class="badge bg-warning text-dark px-3 py-2">On Leave</span>
+
+    {% else %}
+        <span class="badge bg-danger px-3 py-2">Inactive</span>
+    {% endif %}
+</td>
             <td>{{ worker[7] }}</td>
 
             <td>
