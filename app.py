@@ -9,10 +9,10 @@ DB_NAME = "database.db"
 
 # ---------------- DATABASE INIT ----------------
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("database.db")
     cur = conn.cursor()
 
-    # Workers table
+    # workers table
     cur.execute("""
     CREATE TABLE IF NOT EXISTS workers(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +26,7 @@ def init_db():
     )
     """)
 
-    # Users table (LOGIN + ROLES)
+    # users table (IMPORTANT FIX)
     cur.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,17 +36,17 @@ def init_db():
     )
     """)
 
-    # Default admin
-    cur.execute("SELECT * FROM users WHERE username=?", ("admin",))
+# ADMIN
+    cur.execute("SELECT * FROM users WHERE username='admin'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                    ("admin", "admin123", "admin"))
+     cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                ("admin", "admin123", "admin"))
 
-    # Default viewer
-    cur.execute("SELECT * FROM users WHERE username=?", ("viewer",))
+# VIEWER
+    cur.execute("SELECT * FROM users WHERE username='viewer'")
     if not cur.fetchone():
-        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                    ("viewer", "viewer123", "viewer"))
+     cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                ("viewer", "viewer123", "viewer"))
 
     conn.commit()
     conn.close()
@@ -116,7 +116,7 @@ def add_worker():
 
     if request.method == "POST":
 
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect("database.db")
         cur = conn.cursor()
 
         cur.execute("""
@@ -152,7 +152,7 @@ def edit_worker(id):
     if session.get('role') != 'admin':
         return "Access Denied (Admin Only)"
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("database.db")
     cur = conn.cursor()
 
     if request.method == "POST":
@@ -193,7 +193,7 @@ def delete_worker(id):
     if session.get('role') != 'admin':
         return "Access Denied (Admin Only)"
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("database.db")
     cur = conn.cursor()
 
     cur.execute("DELETE FROM workers WHERE id=?", (id,))
@@ -208,12 +208,9 @@ def delete_worker(id):
 @app.route('/search')
 def search():
 
-    if 'user' not in session:
-        return redirect('/login')
+    keyword = request.args.get('keyword', '')
 
-    keyword = request.args.get('keyword')
-
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("database.db")
     cur = conn.cursor()
 
     cur.execute("""
@@ -221,14 +218,43 @@ def search():
         WHERE worker_id LIKE ?
         OR name LIKE ?
         OR department LIKE ?
-    """,
-    (f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'))
+    """, (f'%{keyword}%', f'%{keyword}%', f'%{keyword}%'))
 
     workers = cur.fetchall()
 
+    # 🔥 ADD THIS (IMPORTANT FIX)
+    cur.execute("SELECT COUNT(*) FROM workers")
+    total_workers = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(DISTINCT department) FROM workers")
+    total_departments = cur.fetchone()[0]
+
+    cur.execute("SELECT AVG(salary) FROM workers")
+    avg_salary = cur.fetchone()[0] or 0
+
+    cur.execute("SELECT department, COUNT(*) FROM workers GROUP BY department")
+    dept_data = cur.fetchall()
+    departments = [d[0] for d in dept_data]
+    dept_counts = [d[1] for d in dept_data]
+
+    cur.execute("SELECT name, salary FROM workers")
+    salary_data = cur.fetchall()
+    names = [n[0] for n in salary_data]
+    salaries = [n[1] for n in salary_data]
+
     conn.close()
 
-    return render_template("index.html", workers=workers)
+    return render_template(
+        "index.html",
+        workers=workers,
+        total_workers=total_workers,
+        total_departments=total_departments,
+        avg_salary=avg_salary,
+        departments=departments,
+        dept_counts=dept_counts,
+        names=names,
+        salaries=salaries
+    )
 
 
 # ---------------- EXPORT CSV ----------------
@@ -238,7 +264,7 @@ def export():
     if 'user' not in session:
         return redirect('/login')
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect("database.db")
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM workers")
@@ -269,7 +295,7 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect("database.db")
         cur = conn.cursor()
 
         cur.execute("""
